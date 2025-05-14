@@ -146,10 +146,10 @@ class JSBridge {
           rejected: false,
         );
         _senderCallResponse(message);
-      }).catchError((_) {
+      }).catchError((err) {
         message = JSBridgeMessage.response(
           action: handlerName,
-          data: _.toString(),
+          data: err.toString(),
           id: message.id,
           resolved: false,
           rejected: true,
