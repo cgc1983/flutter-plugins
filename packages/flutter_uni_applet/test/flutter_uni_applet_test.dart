@@ -10,6 +10,11 @@ class MockFlutterUniAppletPlatform
 
   @override
   Future<String?> getPlatformVersion() => Future.value('42');
+
+  @override
+  Future<bool?> openApplet() async {
+    return true;
+  }
 }
 
 void main() {
