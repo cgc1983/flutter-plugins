@@ -81,8 +81,19 @@ android {
 
     dependencies {
         //导入SDK相关依赖jar、aar
-        implementation fileTree(include: ['*.jar'], dir: 'libs')
-        implementation fileTree(include: ['*.aar'], dir: 'libs')
+//        implementation fileTree(include: ['*.jar'], dir: 'libs')
+//        implementation fileTree(include: ['*.aar'], dir: 'libs')
+        // 自动导入所有 .jar 和 .aar
+        def localLibsDir = file('libs')
+        if (localLibsDir.exists()) {
+            localLibsDir.eachFile { file ->
+                if (file.name.endsWith('.jar') || file.name.endsWith('.aar')) {
+                    def name = file.name.substring(0, file.name.lastIndexOf('.'))
+                    def ext = file.name.substring(file.name.lastIndexOf('.') + 1)
+                    dependencies.add('implementation', [name: name, ext: ext])
+                }
+            }
+        }
         //必须添加的依赖
         implementation "androidx.recyclerview:recyclerview:1.1.0"
         implementation "androidx.legacy:legacy-support-v4:1.0.0"

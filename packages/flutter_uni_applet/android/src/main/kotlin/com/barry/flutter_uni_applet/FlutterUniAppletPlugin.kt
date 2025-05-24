@@ -62,7 +62,7 @@ class FlutterUniAppletPlugin : FlutterPlugin, MethodCallHandler {
             uniMPOpenConfiguration.splashClass = this::class.java
             uniMPOpenConfiguration.extraData.put("darkmode", "light")
             val uniMP = DCUniMPSDK.getInstance()
-                .openUniMP(context, "__UNI__F743940", uniMPOpenConfiguration)
+                .openUniMP(context, "__UNI__11E9B73")
 
             result.success(true);
         } else {
