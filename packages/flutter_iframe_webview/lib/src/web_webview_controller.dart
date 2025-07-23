@@ -4,15 +4,16 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:js_interop';
+import 'dart:ui_web' as ui_web;
 
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart';
+import 'package:web/web.dart' as web;
 import 'package:flutter_jsbridge_sdk/flutter_jsbridge_sdk.dart';
 import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
 
 import 'content_type.dart';
 import 'http_request_factory.dart';
-import 'shims/dart_ui.dart' as ui;
 
 /// An implementation of [PlatformWebViewControllerCreationParams] using Flutter
 /// for Web API.
@@ -40,7 +41,7 @@ class WebWebViewControllerCreationParams
 
   /// The underlying element used as the WebView.
   @visibleForTesting
-  final html.IFrameElement iFrame = html.IFrameElement()
+  final web.HTMLIFrameElement iFrame = web.HTMLIFrameElement()
     ..id = 'webView${_nextIFrameId++}'
     ..style.width = '100%'
     ..style.height = '100%'
@@ -62,22 +63,23 @@ class WebWebViewController extends PlatformWebViewController {
       params as WebWebViewControllerCreationParams;
 
   bool _isLoaded = false;
-  StreamSubscription<html.Event>? _iframeOnLoadSubscription;
+  StreamSubscription<web.Event>? _iframeOnLoadSubscription;
 
   WebNavigationDelegate? _currentNavigationDelegate;
 
   static final Map<String, JavaScriptChannelParams> _javaScriptChannelParams =
       <String, JavaScriptChannelParams>{};
 
-  static void _messageEventListener(html.Event event) {
-    if (event is html.MessageEvent) {
+  static void _messageEventListener(web.Event event) {
+    if (event is web.MessageEvent) {
       // final String decodeStr = Uri.decodeComponent(event.data);
       // final Map<String, dynamic> jsonData = jsonDecode(decodeStr);
       // debugPrint('native listen message: $jsonData');
 
       if (_javaScriptChannelParams.keys.contains(jsBridge.channelName)) {
+        debugPrint('native listen message: ${event.data.dartify().toString()}');
         _javaScriptChannelParams[jsBridge.channelName]
-            ?.onMessageReceived(JavaScriptMessage(message: event.data));
+            ?.onMessageReceived(JavaScriptMessage(message: event.data.dartify().toString() ?? ''));
       }
 
       // for (final String channel in _javaScriptChannelParams.keys) {
@@ -102,25 +104,23 @@ class WebWebViewController extends PlatformWebViewController {
   }
 
   void _setupIFrame() {
-    html.IFrameElement iFrame = _webWebViewParams.iFrame;
-    if (iFrame.sandbox != null) {
-      final List<String> sandboxOptions = <String>[
-        'allow-downloads',
-        // 'allow-downloads-without-user-activation',
-        'allow-forms',
-        'allow-modals',
-        'allow-orientation-lock',
-        'allow-pointer-lock',
-        'allow-popups',
-        'allow-popups-to-escape-sandbox',
-        'allow-presentation',
-        'allow-same-origin',
-        // 'allow-storage-access-by-user-activation',
-        'allow-top-navigation',
-        'allow-top-navigation-by-user-activation',
-      ];
-      sandboxOptions.forEach(iFrame.sandbox!.add);
-    }
+    web.HTMLIFrameElement iFrame = _webWebViewParams.iFrame;
+    final List<String> sandboxOptions = <String>[
+      'allow-downloads',
+      // 'allow-downloads-without-user-activation',
+      'allow-forms',
+      'allow-modals',
+      'allow-orientation-lock',
+      'allow-pointer-lock',
+      'allow-popups',
+      'allow-popups-to-escape-sandbox',
+      'allow-presentation',
+      'allow-same-origin',
+      // 'allow-storage-access-by-user-activation',
+      'allow-top-navigation',
+      'allow-top-navigation-by-user-activation',
+    ];
+    sandboxOptions.forEach((String option) => iFrame.sandbox.add(option));
 
     final List<String> allowOptions = <String>[
       'accelerometer',
@@ -133,7 +133,6 @@ class WebWebViewController extends PlatformWebViewController {
         allowOptions.reduce((String current, String next) => '$current; $next');
 
     iFrame.allowFullscreen = true;
-    iFrame.allowPaymentRequest = true;
 
     // final html.MutationObserver observer = html.MutationObserver(
     //   (List mutations, html.MutationObserver observer) {
@@ -164,11 +163,11 @@ class WebWebViewController extends PlatformWebViewController {
   }
 
   void _addMessageEventListener() {
-    html.window.addEventListener('message', _messageEventListener, true);
+    web.window.addEventListener('message', _messageEventListener.toJS, true.toJS);
   }
 
   void _removeMessageEventListener() {
-    html.window.removeEventListener('message', _messageEventListener, true);
+    web.window.removeEventListener('message', _messageEventListener.toJS, true.toJS);
   }
 
   Future<void> postMessage(String javaScript) async {
@@ -179,7 +178,7 @@ class WebWebViewController extends PlatformWebViewController {
     //   final String data = match.namedGroup('data') ?? '';
     //   _webWebViewParams.iFrame.contentWindow?.postMessage(data, '*');
     // }
-    _webWebViewParams.iFrame.contentWindow?.postMessage(javaScript, '*');
+    _webWebViewParams.iFrame.contentWindow?.postMessage(javaScript.toJS, '*'.toJS);
   }
 
   @override
@@ -221,22 +220,23 @@ class WebWebViewController extends PlatformWebViewController {
 
   /// Performs an AJAX request defined by [params].
   Future<void> _updateIFrameFromXhr(LoadRequestParams params) async {
-    final html.HttpRequest httpReq =
-        await _webWebViewParams.httpRequestFactory.request(
+    final web.Response response =
+    await _webWebViewParams.httpRequestFactory.request(
       params.uri.toString(),
       method: params.method.serialize(),
       requestHeaders: params.headers,
       sendData: params.body,
-    );
+    ) as web.Response;
 
-    final String header =
-        httpReq.getResponseHeader('content-type') ?? 'text/html';
+    final String header = response.headers.get('content-type') ?? 'text/html';
     final ContentType contentType = ContentType.parse(header);
     final Encoding encoding = Encoding.getByName(contentType.charset) ?? utf8;
 
     // ignore: unsafe_html
     _webWebViewParams.iFrame.src = Uri.dataFromString(
-      httpReq.responseText ?? '',
+      (await response
+          .text()
+          .toDart).toDart,
       mimeType: contentType.mimeType,
       encoding: encoding,
     ).toString();
@@ -393,7 +393,7 @@ class WebWebViewController extends PlatformWebViewController {
   @override
   Future<void> setJavaScriptMode(JavaScriptMode javaScriptMode) async {
     if (javaScriptMode == JavaScriptMode.unrestricted) {
-      _webWebViewParams.iFrame.sandbox?.add('allow-scripts');
+      _webWebViewParams.iFrame.sandbox.add('allow-scripts');
     }
   }
 
@@ -412,10 +412,9 @@ class WebWebViewWidget extends PlatformWebViewWidget {
       : super.implementation(params) {
     final WebWebViewController controller =
         params.controller as WebWebViewController;
-    ui.platformViewRegistry.registerViewFactory(
+    ui_web.platformViewRegistry.registerViewFactory(
       controller._webWebViewParams.iFrame.id,
-      (int viewId) =>
-          html.DivElement()..append(controller._webWebViewParams.iFrame),
+      (int viewId) => controller._webWebViewParams.iFrame,
     );
   }
 
