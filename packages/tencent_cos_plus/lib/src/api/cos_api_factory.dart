@@ -4,45 +4,34 @@ import 'cos_bucket_api.dart';
 import 'cos_object_api/cos_object_api.dart';
 
 /// COSApi工厂类
+/// 支持创建多个实例，每个实例管理自己的API集合和配置
 class COSApiFactory {
-  COSApiFactory._internal();
-
-  /// 默认的COSBucketApi
+  /// 默认的COSBucketApi键
   static final Symbol _keyCOSBucketApi = #keyCOSBucketApi;
 
-  /// 默认的COSBucketApi
+  /// 默认的COSObjectApi键
   static final Symbol _keyCOSObjectApi = #keyCOSObjectApi;
 
-  /// 读取默认的COSBucketApi
-  static COSBucketApi get bucketApi => get<COSBucketApi>(_keyCOSBucketApi);
-
-  /// 读取默认的COSObjectApi
-  static COSObjectApi get objectApi => get<COSObjectApi>(_keyCOSObjectApi);
-
   /// api集合
-  static final Map<Symbol, COSAbstractApi> _cosApis =
-      <Symbol, COSAbstractApi>{};
-
-  static COSConfig get config {
-    if (_config != null) {
-      return _config!;
-    }
-    throw Exception('initConfig method executed first');
-  }
+  final Map<Symbol, COSAbstractApi> _cosApis = <Symbol, COSAbstractApi>{};
 
   /// cos配置
-  static COSConfig? _config;
+  final COSConfig config;
+
+  /// 构造函数
+  /// [config] cos配置
+  COSApiFactory({required this.config});
+
+  /// 读取默认的COSBucketApi
+  COSBucketApi get bucketApi => get<COSBucketApi>(_keyCOSBucketApi);
+
+  /// 读取默认的COSObjectApi
+  COSObjectApi get objectApi => get<COSObjectApi>(_keyCOSObjectApi);
 
   /// 初始化默认api
-  /// [config] cos配置
   /// [bucketName] 存储桶名称
   /// [region] 区域信息
-  static void initialize({
-    required COSConfig config,
-    required String bucketName,
-    required String region,
-  }) {
-    _config = config;
+  void initialize({required String bucketName, required String region}) {
     createBucketApi(_keyCOSBucketApi, bucketName, region);
     createObjectApi(_keyCOSObjectApi, bucketName, region);
   }
@@ -50,7 +39,7 @@ class COSApiFactory {
   /// 创建Api
   /// [key] 唯一标识
   /// [api] COSAbstractApi实例
-  static void createApi(Symbol key, COSAbstractApi api) {
+  void createApi(Symbol key, COSAbstractApi api) {
     _cosApis[key] = api;
   }
 
@@ -58,18 +47,18 @@ class COSApiFactory {
   /// [key] 唯一标识
   /// [bucketName] 存储桶名称
   /// [region] 区域信息
-  static void createBucketApi(Symbol key, String bucketName, String region) {
+  void createBucketApi(Symbol key, String bucketName, String region) {
     createApi(
       key,
       COSBucketApi(config, bucketName: bucketName, region: region),
     );
   }
 
-  /// 创建Api
+  /// 创建ObjectApi
   /// [key] 唯一标识
   /// [bucketName] 存储桶名称
   /// [region] 区域信息
-  static void createObjectApi(Symbol key, String bucketName, String region) {
+  void createObjectApi(Symbol key, String bucketName, String region) {
     createApi(
       key,
       COSObjectApi(config, bucketName: bucketName, region: region),
@@ -78,7 +67,7 @@ class COSApiFactory {
 
   /// 获取Api
   /// [key] 唯一标识
-  static T get<T extends COSAbstractApi>(Symbol key) {
+  T get<T extends COSAbstractApi>(Symbol key) {
     if (_cosApis.containsKey(key)) {
       return _cosApis[key]! as T;
     }
